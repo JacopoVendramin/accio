@@ -123,7 +123,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 
 	// Delete credential - ignore error as session deletion should succeed
 	// even if credential cleanup fails (credential may not exist)
-	s.secureStore.DeleteCredential(id)
+	_ = s.secureStore.DeleteCredential(id)
 
 	return s.sessionRepo.Delete(ctx, id)
 }
@@ -152,14 +152,14 @@ func (s *Service) Start(ctx context.Context, id string, mfaToken string) error {
 	if err != nil {
 		sess.SetError(err)
 		// Best effort save - we're returning the actual error anyway
-		s.sessionRepo.Save(ctx, sess)
+		_ = s.sessionRepo.Save(ctx, sess)
 		return err
 	}
 
 	// Store credential securely
 	if err := s.secureStore.StoreCredential(sess.ID, cred); err != nil {
 		sess.SetError(err)
-		s.sessionRepo.Save(ctx, sess)
+		_ = s.sessionRepo.Save(ctx, sess)
 		return err
 	}
 
@@ -167,7 +167,7 @@ func (s *Service) Start(ctx context.Context, id string, mfaToken string) error {
 	// These are best-effort operations - credentials are already stored
 	// securely in the keyring, so CLI config failures are non-fatal.
 	if sess.ProfileName != "" {
-		s.awsConfig.WriteCredentials(
+		_ = s.awsConfig.WriteCredentials(
 			sess.ProfileName,
 			cred.AccessKeyID,
 			cred.SecretAccessKey,
@@ -177,7 +177,7 @@ func (s *Service) Start(ctx context.Context, id string, mfaToken string) error {
 	}
 
 	// Also write to default profile so user doesn't need --profile flag
-	s.awsConfig.WriteCredentials(
+	_ = s.awsConfig.WriteCredentials(
 		"default",
 		cred.AccessKeyID,
 		cred.SecretAccessKey,
@@ -208,7 +208,7 @@ func (s *Service) Stop(ctx context.Context, id string) error {
 
 	// Provider cleanup is best-effort - local cleanup should always proceed
 	if p, ok := s.providers[sess.Provider]; ok {
-		p.StopSession(ctx, sess)
+		_ = p.StopSession(ctx, sess)
 	}
 
 	// Delete credential from secure store (best-effort, may already be deleted)

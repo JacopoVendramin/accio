@@ -210,13 +210,19 @@ func (m *Manager) writeProfiles(path string, profiles map[string][]string) error
 	first := true
 	for name, lines := range profiles {
 		if !first {
-			file.WriteString("\n")
+			if _, err := file.WriteString("\n"); err != nil {
+				return err
+			}
 		}
 		first = false
 
-		file.WriteString(fmt.Sprintf("[%s]\n", name))
+		if _, err := file.WriteString(fmt.Sprintf("[%s]\n", name)); err != nil {
+			return err
+		}
 		for _, line := range lines {
-			file.WriteString(line + "\n")
+			if _, err := file.WriteString(line + "\n"); err != nil {
+				return err
+			}
 		}
 	}
 

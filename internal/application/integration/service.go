@@ -129,7 +129,7 @@ func (s *Service) GetToken(integrationID string) (*provider.SSOToken, error) {
 		parts := splitToken(string(data))
 		if len(parts) >= 2 {
 			accessToken = parts[0]
-			fmt.Sscanf(parts[1], "%d", &expiresAt)
+			_, _ = fmt.Sscanf(parts[1], "%d", &expiresAt)
 		}
 	}
 
