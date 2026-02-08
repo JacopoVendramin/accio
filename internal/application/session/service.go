@@ -212,16 +212,16 @@ func (s *Service) Stop(ctx context.Context, id string) error {
 	}
 
 	// Delete credential from secure store (best-effort, may already be deleted)
-	s.secureStore.DeleteCredential(sess.ID)
+	_ = s.secureStore.DeleteCredential(sess.ID)
 
 	// Clear credentials from AWS config files (best-effort cleanup)
 	if sess.ProfileName != "" {
-		s.awsConfig.ClearCredentials(sess.ProfileName)
+		_ = s.awsConfig.ClearCredentials(sess.ProfileName)
 	}
 
 	// Clear default profile if this session was the active default
 	if s.activeDefaultSession == sess.ID {
-		s.awsConfig.ClearCredentials("default")
+		_ = s.awsConfig.ClearCredentials("default")
 		s.activeDefaultSession = ""
 	}
 
@@ -254,7 +254,7 @@ func (s *Service) Rotate(ctx context.Context, id string, mfaToken string) error 
 	cred, err := p.RotateCredentials(ctx, sess, mfaToken)
 	if err != nil {
 		sess.SetError(err)
-		s.sessionRepo.Save(ctx, sess)
+		_ = s.sessionRepo.Save(ctx, sess)
 		return err
 	}
 
@@ -265,7 +265,7 @@ func (s *Service) Rotate(ctx context.Context, id string, mfaToken string) error 
 
 	// Write credentials to AWS config files (best-effort, non-fatal)
 	if sess.ProfileName != "" {
-		s.awsConfig.WriteCredentials(
+		_ = s.awsConfig.WriteCredentials(
 			sess.ProfileName,
 			cred.AccessKeyID,
 			cred.SecretAccessKey,
@@ -276,7 +276,7 @@ func (s *Service) Rotate(ctx context.Context, id string, mfaToken string) error 
 
 	// Update default profile if this is the active default session
 	if s.activeDefaultSession == sess.ID {
-		s.awsConfig.WriteCredentials(
+		_ = s.awsConfig.WriteCredentials(
 			"default",
 			cred.AccessKeyID,
 			cred.SecretAccessKey,
@@ -356,15 +356,15 @@ func (s *Service) DeleteWithSecret(ctx context.Context, id string) error {
 
 	// Stop the session first if active - continue with deletion even if stop fails
 	if sess.IsActive() {
-		s.Stop(ctx, id)
+		_ = s.Stop(ctx, id)
 	}
 
 	// Clean up credentials and secrets (best-effort, may not exist)
-	s.secureStore.DeleteCredential(id)
+	_ = s.secureStore.DeleteCredential(id)
 
 	if sess.Type == session.SessionTypeIAMUser {
 		key := "iam-user-secret:" + id
-		s.secureStore.DeleteSecret(key)
+		_ = s.secureStore.DeleteSecret(key)
 	}
 
 	return s.sessionRepo.Delete(ctx, id)

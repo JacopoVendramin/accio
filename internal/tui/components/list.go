@@ -115,7 +115,7 @@ func (l *SessionList) renderSession(sess *session.Session, selected bool) string
 	// Session name
 	nameStyle := l.theme.SessionName
 	if selected {
-		nameStyle = nameStyle.Copy().Bold(true)
+		nameStyle = nameStyle.Bold(true)
 	}
 	parts = append(parts, nameStyle.Render(sess.Name))
 

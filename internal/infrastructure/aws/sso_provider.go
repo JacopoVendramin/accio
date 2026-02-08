@@ -157,7 +157,7 @@ func (p *SSOProvider) GetAccessToken(integrationID string) (*provider.SSOToken, 
 	}
 
 	var expiresAt int64
-	fmt.Sscanf(parts[1], "%d", &expiresAt)
+	_, _ = fmt.Sscanf(parts[1], "%d", &expiresAt)
 
 	token := &provider.SSOToken{
 		AccessToken: parts[0],

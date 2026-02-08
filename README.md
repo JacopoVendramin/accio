@@ -44,6 +44,16 @@ cd accio
 go build -o accio ./cmd/accio
 ```
 
+### macOS
+
+When running a downloaded binary for the first time, macOS may show a warning: *"accio cannot be verified"*. This happens because the binary is not signed with an Apple Developer certificate.
+
+To allow execution, remove the quarantine attribute:
+
+```bash
+xattr -d com.apple.quarantine ./accio
+```
+
 ## Usage
 
 ### Start the TUI
