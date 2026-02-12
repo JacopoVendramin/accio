@@ -268,12 +268,12 @@ func (v *SessionListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		// Handle mouse wheel scrolling
 		if !v.searchActive {
-			switch msg.Type {
-			case tea.MouseWheelUp:
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
 				if v.cursor > 0 {
 					v.cursor--
 				}
-			case tea.MouseWheelDown:
+			case tea.MouseButtonWheelDown:
 				if v.cursor < len(v.filteredSessions)-1 {
 					v.cursor++
 				}
@@ -482,7 +482,7 @@ func (v *SessionListView) renderSession(sess *session.Session, selected bool) st
 	}
 	if len(extras) > 0 {
 		// Use inline style without margin
-		subtitleStyle := v.theme.Subtitle.Copy().MarginBottom(0)
+		subtitleStyle := v.theme.Subtitle.MarginBottom(0)
 		line += " " + subtitleStyle.Render("("+strings.Join(extras, " • ")+")")
 	}
 

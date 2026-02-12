@@ -179,12 +179,12 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.scroll++
 		}
 	case tea.MouseMsg:
-		switch msg.Type {
-		case tea.MouseWheelUp:
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
 			if v.scroll > 0 {
 				v.scroll--
 			}
-		case tea.MouseWheelDown:
+		case tea.MouseButtonWheelDown:
 			v.scroll++
 		}
 	}
