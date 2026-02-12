@@ -81,6 +81,7 @@ func NewIntegrationListView(theme *styles.Theme) *IntegrationListView {
 		{Key: "↑/↓", Desc: "navigate"},
 		{Key: "enter", Desc: "sync"},
 		{Key: "a", Desc: "add"},
+		{Key: "e", Desc: "edit"},
 		{Key: "d", Desc: "delete"},
 		{Key: "esc", Desc: "back"},
 	})

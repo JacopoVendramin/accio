@@ -19,6 +19,7 @@ type Service struct {
 	awsConfig            *awsconfig.Manager
 	providers            map[session.Provider]provider.CloudProvider
 	refreshBefore        time.Duration
+	inactivityTimeout    time.Duration
 	activeDefaultSession string // ID of session currently set as default profile
 }
 
@@ -37,13 +38,15 @@ func NewService(
 	sessionRepo session.Repository,
 	secureStore SecureStore,
 	refreshBefore time.Duration,
+	inactivityTimeout time.Duration,
 ) *Service {
 	return &Service{
-		sessionRepo:   sessionRepo,
-		secureStore:   secureStore,
-		awsConfig:     awsconfig.NewManager("", "", "", false),
-		providers:     make(map[session.Provider]provider.CloudProvider),
-		refreshBefore: refreshBefore,
+		sessionRepo:       sessionRepo,
+		secureStore:       secureStore,
+		awsConfig:         awsconfig.NewManager("", "", "", false),
+		providers:         make(map[session.Provider]provider.CloudProvider),
+		refreshBefore:     refreshBefore,
+		inactivityTimeout: inactivityTimeout,
 	}
 }
 
@@ -126,6 +129,50 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	_ = s.secureStore.DeleteCredential(id)
 
 	return s.sessionRepo.Delete(ctx, id)
+}
+
+// invalidateInactiveSession invalidates a session that has been inactive for too long.
+func (s *Service) invalidateInactiveSession(ctx context.Context, sess *session.Session) error {
+	// Delete credential from secure store
+	_ = s.secureStore.DeleteCredential(sess.ID)
+
+	// Clear credentials from AWS config files (best-effort cleanup)
+	if sess.ProfileName != "" {
+		_ = s.awsConfig.ClearCredentials(sess.ProfileName)
+	}
+
+	// Clear default profile if this session was the active default
+	if s.activeDefaultSession == sess.ID {
+		_ = s.awsConfig.ClearCredentials("default")
+		s.activeDefaultSession = ""
+	}
+
+	// Mark session as inactive
+	if err := sess.Stop(); err != nil {
+		return err
+	}
+
+	return s.sessionRepo.Save(ctx, sess)
+}
+
+// CheckAndInvalidateInactiveSessions checks all sessions and invalidates those that are inactive.
+func (s *Service) CheckAndInvalidateInactiveSessions(ctx context.Context) error {
+	if s.inactivityTimeout == 0 {
+		return nil // Inactivity checking disabled
+	}
+
+	sessions, err := s.sessionRepo.List(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, sess := range sessions {
+		if sess.IsActive() && sess.IsInactive(s.inactivityTimeout) {
+			_ = s.invalidateInactiveSession(ctx, sess)
+		}
+	}
+
+	return nil
 }
 
 // Start starts a session and obtains credentials.
@@ -300,6 +347,17 @@ func (s *Service) GetCredential(ctx context.Context, id string) (*credential.Cre
 		return nil, err
 	}
 
+	// Check if session is inactive
+	if s.inactivityTimeout > 0 && sess.IsInactive(s.inactivityTimeout) {
+		// Invalidate the session
+		if err := s.invalidateInactiveSession(ctx, sess); err != nil {
+			return nil, domainErrors.NewDomainError("GetCredential", domainErrors.ErrCredentialExpired, err).
+				WithContext("reason", "session inactive")
+		}
+		return nil, domainErrors.NewDomainError("GetCredential", domainErrors.ErrCredentialExpired, nil).
+			WithContext("reason", "session inactive")
+	}
+
 	cred, err := s.secureStore.GetCredential(sess.ID)
 	if err != nil {
 		return nil, err
@@ -321,6 +379,10 @@ func (s *Service) GetCredential(ctx context.Context, id string) (*credential.Cre
 			}
 		}
 	}
+
+	// Update last used timestamp
+	sess.UpdateLastUsed()
+	_ = s.sessionRepo.Save(ctx, sess)
 
 	return cred, nil
 }

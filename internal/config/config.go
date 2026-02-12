@@ -19,10 +19,11 @@ type Config struct {
 	ColorScheme string `koanf:"color_scheme"`
 
 	// Session defaults
-	DefaultRegion          string        `koanf:"default_region"`
-	DefaultSessionDuration time.Duration `koanf:"default_session_duration"`
-	RefreshBeforeExpiry    time.Duration `koanf:"refresh_before_expiry"`
-	ClearOnExit            bool          `koanf:"clear_on_exit"`
+	DefaultRegion            string        `koanf:"default_region"`
+	DefaultSessionDuration   time.Duration `koanf:"default_session_duration"`
+	RefreshBeforeExpiry      time.Duration `koanf:"refresh_before_expiry"`
+	SessionInactivityTimeout time.Duration `koanf:"session_inactivity_timeout"`
+	ClearOnExit              bool          `koanf:"clear_on_exit"`
 
 	// AWS configuration
 	AWS AWSConfig `koanf:"aws"`
@@ -72,12 +73,13 @@ func DefaultConfig() *Config {
 	configDir := filepath.Join(homeDir, ".accio")
 
 	return &Config{
-		LogLevel:               "info",
-		ColorScheme:            "auto",
-		DefaultRegion:          "us-east-1",
-		DefaultSessionDuration: time.Hour,
-		RefreshBeforeExpiry:    5 * time.Minute,
-		ClearOnExit:            false,
+		LogLevel:                 "info",
+		ColorScheme:              "auto",
+		DefaultRegion:            "us-east-1",
+		DefaultSessionDuration:   time.Hour,
+		RefreshBeforeExpiry:      5 * time.Minute,
+		SessionInactivityTimeout: 24 * time.Hour, // 24 hours by default
+		ClearOnExit:              false,
 		AWS: AWSConfig{
 			ConfigFile:           filepath.Join(homeDir, ".aws", "config"),
 			CredentialsFile:      filepath.Join(homeDir, ".aws", "credentials"),
@@ -203,12 +205,13 @@ func (m *Manager) getConfigPath() string {
 // configToMap converts config to a map for YAML marshaling.
 func (m *Manager) configToMap() map[string]interface{} {
 	return map[string]interface{}{
-		"log_level":                m.config.LogLevel,
-		"color_scheme":             m.config.ColorScheme,
-		"default_region":           m.config.DefaultRegion,
-		"default_session_duration": m.config.DefaultSessionDuration.String(),
-		"refresh_before_expiry":    m.config.RefreshBeforeExpiry.String(),
-		"clear_on_exit":            m.config.ClearOnExit,
+		"log_level":                  m.config.LogLevel,
+		"color_scheme":               m.config.ColorScheme,
+		"default_region":             m.config.DefaultRegion,
+		"default_session_duration":   m.config.DefaultSessionDuration.String(),
+		"refresh_before_expiry":      m.config.RefreshBeforeExpiry.String(),
+		"session_inactivity_timeout": m.config.SessionInactivityTimeout.String(),
+		"clear_on_exit":              m.config.ClearOnExit,
 		"aws": map[string]interface{}{
 			"config_file":            m.config.AWS.ConfigFile,
 			"credentials_file":       m.config.AWS.CredentialsFile,

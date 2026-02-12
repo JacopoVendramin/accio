@@ -10,20 +10,20 @@ import (
 
 // Session represents a cloud credentials session.
 type Session struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	Provider     Provider        `json:"provider"`
-	Type         SessionType     `json:"type"`
-	Status       SessionStatus   `json:"status"`
-	ProfileName  string          `json:"profile_name"`
-	Region       string          `json:"region"`
-	Config       SessionConfig   `json:"config"`
-	Metadata     SessionMetadata `json:"metadata"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Provider    Provider        `json:"provider"`
+	Type        SessionType     `json:"type"`
+	Status      SessionStatus   `json:"status"`
+	ProfileName string          `json:"profile_name"`
+	Region      string          `json:"region"`
+	Config      SessionConfig   `json:"config"`
+	Metadata    SessionMetadata `json:"metadata"`
 
 	// Runtime state (not persisted)
-	credential   *credential.Credential
-	lastError    error
-	expiresAt    time.Time
+	credential *credential.Credential
+	lastError  error
+	expiresAt  time.Time
 }
 
 // NewSession creates a new session with the given parameters.
@@ -196,4 +196,19 @@ func (s *Session) GetSessionDuration() int {
 	}
 
 	return defaultDuration
+}
+
+// IsInactive returns true if the session has been inactive for longer than the given duration.
+func (s *Session) IsInactive(inactivityTimeout time.Duration) bool {
+	if s.Metadata.LastUsedAt.IsZero() {
+		// If never used, check created time
+		return time.Since(s.Metadata.CreatedAt) > inactivityTimeout
+	}
+	return time.Since(s.Metadata.LastUsedAt) > inactivityTimeout
+}
+
+// UpdateLastUsed updates the last used timestamp.
+func (s *Session) UpdateLastUsed() {
+	s.Metadata.LastUsedAt = time.Now()
+	s.Metadata.UpdatedAt = time.Now()
 }

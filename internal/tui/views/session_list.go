@@ -82,6 +82,7 @@ type SessionListView struct {
 	filteredSessions []*session.Session
 	integrations     []*integration.Integration
 	cursor           int
+	scrollOffset     int // Track scroll position for viewport
 
 	// Search
 	searchInput  textinput.Model
@@ -100,9 +101,9 @@ func NewSessionListView(theme *styles.Theme) *SessionListView {
 	helpBar.SetBindings([]components.KeyBinding{
 		{Key: "↑/↓", Desc: "navigate"},
 		{Key: "enter", Desc: "connect"},
-		{Key: "n", Desc: "new integration"},
 		{Key: "/", Desc: "search"},
 		{Key: "i", Desc: "integrations"},
+		{Key: "?", Desc: "help"},
 		{Key: "q", Desc: "quit"},
 	})
 
@@ -187,6 +188,24 @@ func (v *SessionListView) Selected() *session.Session {
 	return v.filteredSessions[v.cursor]
 }
 
+// SelectSessionByID selects a session by its ID after a reload.
+func (v *SessionListView) SelectSessionByID(id string) {
+	if id == "" {
+		return
+	}
+	for i, sess := range v.filteredSessions {
+		if sess.ID == id {
+			v.cursor = i
+			return
+		}
+	}
+}
+
+// IsSearchActive returns whether search mode is active.
+func (v *SessionListView) IsSearchActive() bool {
+	return v.searchActive
+}
+
 // Update handles input for the session list view.
 func (v *SessionListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -233,10 +252,6 @@ func (v *SessionListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return v, v.onStartStop(sess)
 				}
 			}
-		case key.Matches(msg, v.keyMap.New):
-			if v.onNewIntegration != nil {
-				return v, v.onNewIntegration()
-			}
 		case key.Matches(msg, v.keyMap.Delete):
 			if v.onDelete != nil {
 				if sess := v.Selected(); sess != nil {
@@ -250,6 +265,20 @@ func (v *SessionListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keyMap.Quit):
 			return v, tea.Quit
 		}
+	case tea.MouseMsg:
+		// Handle mouse wheel scrolling
+		if !v.searchActive {
+			switch msg.Type {
+			case tea.MouseWheelUp:
+				if v.cursor > 0 {
+					v.cursor--
+				}
+			case tea.MouseWheelDown:
+				if v.cursor < len(v.filteredSessions)-1 {
+					v.cursor++
+				}
+			}
+		}
 	}
 	return v, nil
 }
@@ -258,42 +287,93 @@ func (v *SessionListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *SessionListView) View() string {
 	var b strings.Builder
 
+	// Header with summary statistics
+	activeSessions := 0
+	for _, sess := range v.allSessions {
+		if sess.Status == session.StatusActive {
+			activeSessions++
+		}
+	}
+
+	// Title and stats
+	title := v.theme.Title.Render("AWS Sessions")
+	stats := v.theme.Subtitle.Render(fmt.Sprintf(
+		"%d total • %d active • %d integrations",
+		len(v.allSessions),
+		activeSessions,
+		len(v.integrations),
+	))
+
+	b.WriteString(title)
+	b.WriteString("  ")
+	b.WriteString(stats)
+	b.WriteString("\n\n")
+
+	// Calculate available height for content (subtract header, footer, padding)
+	availableHeight := v.height - 7 // Reserve more space for header
+
 	// Search bar (only show when active or has value)
+	headerLines := 0
 	if v.searchActive {
 		b.WriteString(v.theme.Label.Render("Search: "))
 		b.WriteString(v.searchInput.View())
 		b.WriteString("\n\n")
+		headerLines = 2
 	} else if v.searchInput.Value() != "" {
 		b.WriteString(v.theme.Subtitle.Render(fmt.Sprintf("Filter: %s", v.searchInput.Value())))
 		b.WriteString("\n\n")
+		headerLines = 2
 	}
+
+	availableHeight -= headerLines
 
 	// Sessions grouped by integration
 	if len(v.filteredSessions) == 0 {
 		if len(v.allSessions) == 0 {
 			b.WriteString(v.theme.Subtitle.Render("No sessions configured."))
 			b.WriteString("\n")
-			b.WriteString(v.theme.InfoText.Render("Press 'n' to add an integration."))
+			b.WriteString(v.theme.InfoText.Render("Press 'i' to add an integration."))
 		} else {
 			b.WriteString(v.theme.Subtitle.Render("No sessions match your search."))
 		}
 	} else {
+		// Adjust scroll offset to keep cursor visible
+		if v.cursor < v.scrollOffset {
+			v.scrollOffset = v.cursor
+		} else if v.cursor >= v.scrollOffset+availableHeight {
+			v.scrollOffset = v.cursor - availableHeight + 1
+		}
+
 		// Group sessions by integration
 		groups := v.groupSessionsByIntegration()
 		currentIndex := 0
+		renderedLines := 0
 
 		for i, group := range groups {
-			// Add spacing between groups (not before first)
-			if i > 0 {
+			// Check if we should render spacing between groups
+			if i > 0 && currentIndex > v.scrollOffset && renderedLines < availableHeight {
 				b.WriteString("\n")
+				renderedLines++
 			}
-			// Integration header
-			b.WriteString(v.theme.Label.Render(group.Name))
-			b.WriteString("\n")
+
+			// Render integration header if visible
+			groupStartIndex := currentIndex
+			if groupStartIndex <= v.scrollOffset+availableHeight && groupStartIndex+len(group.Sessions) > v.scrollOffset {
+				if currentIndex >= v.scrollOffset && renderedLines < availableHeight {
+					b.WriteString(v.theme.Label.Render(group.Name))
+					b.WriteString("\n")
+					renderedLines++
+				}
+			}
 
 			for _, sess := range group.Sessions {
-				isSelected := v.cursor == currentIndex
-				b.WriteString(v.renderSession(sess, isSelected))
+				// Only render if within visible viewport
+				if currentIndex >= v.scrollOffset && renderedLines < availableHeight {
+					isSelected := v.cursor == currentIndex
+					b.WriteString(v.renderSession(sess, isSelected))
+					b.WriteString("\n")
+					renderedLines++
+				}
 				currentIndex++
 			}
 		}
@@ -371,10 +451,8 @@ func (v *SessionListView) groupSessionsByIntegration() []SessionGroup {
 	return result
 }
 
-// renderSession renders a single session with two lines.
+// renderSession renders a single session.
 func (v *SessionListView) renderSession(sess *session.Session, selected bool) string {
-	var b strings.Builder
-
 	// Status icon
 	var statusIcon string
 	var statusStyle = v.theme.StatusInactive
@@ -391,10 +469,10 @@ func (v *SessionListView) renderSession(sess *session.Session, selected bool) st
 		cursor = "▶"
 	}
 
-	// First line: cursor, status, name, profile, region
-	line1 := fmt.Sprintf("%s %s %s", cursor, statusStyle.Render(statusIcon), sess.Name)
+	// Build the line: cursor, status, name, profile, region
+	line := fmt.Sprintf("  %s %s %s", cursor, statusStyle.Render(statusIcon), sess.Name)
 
-	// Add profile and region info
+	// Add profile and region info (without extra margin)
 	extras := []string{}
 	if sess.ProfileName != "" {
 		extras = append(extras, sess.ProfileName)
@@ -403,17 +481,17 @@ func (v *SessionListView) renderSession(sess *session.Session, selected bool) st
 		extras = append(extras, sess.Region)
 	}
 	if len(extras) > 0 {
-		line1 += " " + v.theme.Subtitle.Render("("+strings.Join(extras, " • ")+")")
+		// Use inline style without margin
+		subtitleStyle := v.theme.Subtitle.Copy().MarginBottom(0)
+		line += " " + subtitleStyle.Render("("+strings.Join(extras, " • ")+")")
 	}
 
+	// Apply bold if selected
 	if selected {
-		b.WriteString(v.theme.SessionItemSelected.Render(line1))
-	} else {
-		b.WriteString(v.theme.SessionItem.Render(line1))
+		line = v.theme.SessionItemSelected.Render(line)
 	}
-	b.WriteString("\n")
 
-	return b.String()
+	return line
 }
 
 // Init initializes the view.

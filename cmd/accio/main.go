@@ -9,9 +9,9 @@ import (
 	"github.com/jvendramin/accio/internal/application/session"
 	"github.com/jvendramin/accio/internal/config"
 	"github.com/jvendramin/accio/internal/infrastructure/aws"
+	"github.com/jvendramin/accio/internal/infrastructure/process"
 	configStorage "github.com/jvendramin/accio/internal/infrastructure/storage/config"
 	"github.com/jvendramin/accio/internal/infrastructure/storage/keyring"
-	"github.com/jvendramin/accio/internal/infrastructure/process"
 	"github.com/jvendramin/accio/internal/tui"
 )
 
@@ -77,6 +77,7 @@ func run() error {
 		sessionRepo,
 		store,
 		cfg.RefreshBeforeExpiry,
+		cfg.SessionInactivityTimeout,
 	)
 
 	// Initialize integration service
@@ -127,6 +128,7 @@ func runCredentialProcess(args []string) error {
 		sessionRepo,
 		store,
 		cfg.RefreshBeforeExpiry,
+		cfg.SessionInactivityTimeout,
 	)
 
 	// Register unified AWS provider

@@ -82,6 +82,12 @@ func (s *Service) Create(ctx context.Context, integ *integration.Integration) er
 	return s.integrationRepo.Save(ctx, integ)
 }
 
+// Update updates an existing integration.
+func (s *Service) Update(ctx context.Context, integ *integration.Integration) error {
+	integ.Metadata.UpdatedAt = time.Now()
+	return s.integrationRepo.Save(ctx, integ)
+}
+
 // Delete removes an integration and its associated sessions.
 func (s *Service) Delete(ctx context.Context, id string) error {
 	// Get the integration first

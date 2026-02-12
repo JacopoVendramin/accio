@@ -5,6 +5,7 @@ import (
 	"context"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +31,7 @@ const (
 	ViewSessionEdit
 	ViewIntegrationList
 	ViewIntegrationCreate
+	ViewIntegrationEdit
 	ViewIntegrationSync
 	ViewSettings
 	ViewHelp
@@ -45,17 +47,18 @@ type App struct {
 	configManager      *config.Manager
 
 	// State
-	currentView         ViewType
-	previousView        ViewType
-	sessions            []*domainSession.Session
-	integrations        []*integration.Integration
-	selectedSession     *domainSession.Session
-	selectedIntegration *integration.Integration
-	notification        string
-	notifyExpiry        time.Time
-	notifyIsError       bool
-	width               int
-	height              int
+	currentView           ViewType
+	previousView          ViewType
+	sessions              []*domainSession.Session
+	integrations          []*integration.Integration
+	selectedSession       *domainSession.Session
+	selectedIntegration   *integration.Integration
+	lastSelectedSessionID string // Track last selected session ID for reload
+	notification          string
+	notifyExpiry          time.Time
+	notifyIsError         bool
+	width                 int
+	height                int
 
 	// Sync state
 	syncDeviceAuth *provider.DeviceAuthorizationResponse
@@ -69,6 +72,7 @@ type App struct {
 	editSessionView       *views.EditSessionView
 	integrationListView   *views.IntegrationListView
 	integrationWizardView *views.IntegrationWizardView
+	editIntegrationView   *views.EditIntegrationView
 	syncView              *views.SyncView
 	settingsView          *views.SettingsView
 	helpView              *views.HelpView
@@ -98,6 +102,7 @@ func NewApp(sessionService *session.Service, integrationService *integrationApp.
 	app.editSessionView = views.NewEditSessionView(theme)
 	app.integrationListView = views.NewIntegrationListView(theme)
 	app.integrationWizardView = views.NewIntegrationWizardView(theme)
+	app.editIntegrationView = views.NewEditIntegrationView(theme)
 	app.syncView = views.NewSyncView(theme)
 	app.settingsView = views.NewSettingsView(theme)
 	app.helpView = views.NewHelpView(theme)
@@ -148,6 +153,10 @@ func NewApp(sessionService *session.Service, integrationService *integrationApp.
 	app.integrationWizardView.SetOnCreate(app.handleCreateIntegration)
 	app.integrationWizardView.SetOnCancel(app.handleCancelIntegrationCreate)
 
+	// Set up edit integration view callbacks
+	app.editIntegrationView.SetOnSave(app.handleSaveIntegration)
+	app.editIntegrationView.SetOnCancel(app.handleCancelIntegrationEdit)
+
 	// Set up sync view callbacks
 	app.syncView.SetOnCancel(app.handleCancelSync)
 	app.syncView.SetOnOpenURL(app.handleOpenURL)
@@ -188,6 +197,11 @@ type SessionDeletedMsg struct {
 }
 
 type IntegrationCreatedMsg struct {
+	Integration *integration.Integration
+	Err         error
+}
+
+type IntegrationUpdatedMsg struct {
 	Integration *integration.Integration
 	Err         error
 }
@@ -266,6 +280,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.sessions = msg.Sessions
 			a.sessionListView.SetSessions(msg.Sessions)
 			a.createWizardView.SetParentSessions(msg.Sessions)
+			// Restore last selected session if available
+			if a.lastSelectedSessionID != "" {
+				a.sessionListView.SelectSessionByID(a.lastSelectedSessionID)
+			}
 		}
 
 	case IntegrationsLoadedMsg:
@@ -288,6 +306,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		} else {
 			a.setNotification("Session started: "+msg.Session.Name, false)
+			// Save the session ID to restore selection after reload
+			a.lastSelectedSessionID = msg.Session.ID
 			cmds = append(cmds, a.loadSessions())
 		}
 
@@ -296,6 +316,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setNotification("Error stopping session: "+msg.Err.Error(), true)
 		} else {
 			a.setNotification("Session stopped: "+msg.Session.Name, false)
+			// Save the session ID to restore selection after reload
+			a.lastSelectedSessionID = msg.Session.ID
 			cmds = append(cmds, a.loadSessions())
 		}
 
@@ -324,6 +346,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.setNotification("Integration created: "+msg.Integration.Name, false)
 			a.currentView = ViewIntegrationList
 			a.integrationWizardView.Reset()
+			cmds = append(cmds, a.loadIntegrations())
+		}
+
+	case IntegrationUpdatedMsg:
+		if msg.Err != nil {
+			a.setNotification("Error updating integration: "+msg.Err.Error(), true)
+		} else {
+			a.setNotification("Integration updated: "+msg.Integration.Name, false)
+			a.currentView = ViewIntegrationList
 			cmds = append(cmds, a.loadIntegrations())
 		}
 
@@ -433,37 +464,46 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Global key handling
 		if a.currentView == ViewSessionList {
+			// Don't process global shortcuts if search is active
+			if !a.sessionListView.IsSearchActive() {
+				switch msg.String() {
+				case "v":
+					if sess := a.sessionListView.Selected(); sess != nil {
+						a.selectedSession = sess
+						a.sessionDetailView.SetSession(sess)
+						a.previousView = a.currentView
+						a.currentView = ViewSessionDetail
+						return a, nil
+					}
+				case "i":
+					// Show integrations
+					a.previousView = a.currentView
+					a.currentView = ViewIntegrationList
+					return a, a.loadIntegrations()
+				case "s":
+					a.settingsView.SetConfig(a.configManager.Get())
+					a.previousView = a.currentView
+					a.currentView = ViewSettings
+					return a, nil
+				case "?":
+					a.previousView = a.currentView
+					a.currentView = ViewHelp
+					return a, nil
+				}
+			}
+		}
+
+		// Integration list shortcuts
+		if a.currentView == ViewIntegrationList {
 			switch msg.String() {
-			case "v":
-				if sess := a.sessionListView.Selected(); sess != nil {
-					a.selectedSession = sess
-					a.sessionDetailView.SetSession(sess)
-					a.previousView = a.currentView
-					a.currentView = ViewSessionDetail
-					return a, nil
-				}
 			case "e":
-				if sess := a.sessionListView.Selected(); sess != nil {
-					a.selectedSession = sess
-					a.editSessionView.SetSession(sess)
+				if integ := a.integrationListView.Selected(); integ != nil {
+					a.selectedIntegration = integ
+					a.editIntegrationView.SetIntegration(integ)
 					a.previousView = a.currentView
-					a.currentView = ViewSessionEdit
+					a.currentView = ViewIntegrationEdit
 					return a, nil
 				}
-			case "i":
-				// Show integrations
-				a.previousView = a.currentView
-				a.currentView = ViewIntegrationList
-				return a, a.loadIntegrations()
-			case "s":
-				a.settingsView.SetConfig(a.configManager.Get())
-				a.previousView = a.currentView
-				a.currentView = ViewSettings
-				return a, nil
-			case "?":
-				a.previousView = a.currentView
-				a.currentView = ViewHelp
-				return a, nil
 			}
 		}
 
@@ -482,6 +522,10 @@ func (a *App) updateCurrentView(msg tea.Msg) tea.Cmd {
 	switch a.currentView {
 	case ViewSessionList:
 		_, cmd = a.sessionListView.Update(msg)
+		// Track the currently selected session ID for stable selection after reload
+		if sess := a.sessionListView.Selected(); sess != nil {
+			a.lastSelectedSessionID = sess.ID
+		}
 	case ViewSessionDetail:
 		_, cmd = a.sessionDetailView.Update(msg)
 	case ViewSessionCreate:
@@ -492,6 +536,8 @@ func (a *App) updateCurrentView(msg tea.Msg) tea.Cmd {
 		_, cmd = a.integrationListView.Update(msg)
 	case ViewIntegrationCreate:
 		_, cmd = a.integrationWizardView.Update(msg)
+	case ViewIntegrationEdit:
+		_, cmd = a.editIntegrationView.Update(msg)
 	case ViewIntegrationSync:
 		_, cmd = a.syncView.Update(msg)
 	case ViewSettings:
@@ -514,6 +560,7 @@ func (a *App) updateViewSizes() {
 	a.editSessionView.SetSize(a.width, a.height)
 	a.integrationListView.SetSize(a.width, a.height)
 	a.integrationWizardView.SetSize(a.width, a.height)
+	a.editIntegrationView.SetSize(a.width, a.height)
 	a.syncView.SetSize(a.width, a.height)
 	a.settingsView.SetSize(a.width, a.height)
 	a.helpView.SetSize(a.width, a.height)
@@ -538,6 +585,8 @@ func (a *App) View() string {
 		content = a.integrationListView.View()
 	case ViewIntegrationCreate:
 		content = a.integrationWizardView.View()
+	case ViewIntegrationEdit:
+		content = a.editIntegrationView.View()
 	case ViewIntegrationSync:
 		content = a.syncView.View()
 	case ViewSettings:
@@ -571,6 +620,27 @@ func (a *App) loadSessions() tea.Cmd {
 			return SessionsLoadedMsg{Sessions: nil}
 		}
 		sessions, err := a.sessionService.List(context.Background())
+		if err == nil && sessions != nil {
+			// Sort sessions by integration ID, then by name for stable ordering
+			sort.Slice(sessions, func(i, j int) bool {
+				// Get integration IDs
+				integIDi := ""
+				integIDj := ""
+				if sessions[i].Config.AWSSSO != nil {
+					integIDi = sessions[i].Config.AWSSSO.IntegrationID
+				}
+				if sessions[j].Config.AWSSSO != nil {
+					integIDj = sessions[j].Config.AWSSSO.IntegrationID
+				}
+
+				// First sort by integration ID
+				if integIDi != integIDj {
+					return integIDi < integIDj
+				}
+				// Then by session name
+				return sessions[i].Name < sessions[j].Name
+			})
+		}
 		return SessionsLoadedMsg{Sessions: sessions, Err: err}
 	}
 }
@@ -913,6 +983,22 @@ func (a *App) handleCreateIntegration(integ *integration.Integration) tea.Cmd {
 func (a *App) handleCancelIntegrationCreate() tea.Cmd {
 	return func() tea.Msg {
 		a.integrationWizardView.Reset()
+		return SwitchViewMsg{View: ViewIntegrationList}
+	}
+}
+
+func (a *App) handleSaveIntegration(integ *integration.Integration) tea.Cmd {
+	return func() tea.Msg {
+		if a.integrationService == nil {
+			return IntegrationUpdatedMsg{Integration: integ, Err: nil}
+		}
+		err := a.integrationService.Update(context.Background(), integ)
+		return IntegrationUpdatedMsg{Integration: integ, Err: err}
+	}
+}
+
+func (a *App) handleCancelIntegrationEdit() tea.Cmd {
+	return func() tea.Msg {
 		return SwitchViewMsg{View: ViewIntegrationList}
 	}
 }

@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -10,9 +11,9 @@ import (
 
 // HelpKeyMap defines key bindings for the help view.
 type HelpKeyMap struct {
-	Up    key.Binding
-	Down  key.Binding
-	Back  key.Binding
+	Up   key.Binding
+	Down key.Binding
+	Back key.Binding
 }
 
 // DefaultHelpKeyMap returns the default key bindings.
@@ -73,14 +74,25 @@ func defaultHelpSections() []HelpSection {
 			Bindings: []HelpBinding{
 				{Key: "↑/↓ or j/k", Desc: "Navigate sessions"},
 				{Key: "enter", Desc: "Start/Stop selected session"},
-				{Key: "n", Desc: "Create new session"},
-				{Key: "d", Desc: "Delete selected session"},
-				{Key: "e", Desc: "Edit selected session"},
 				{Key: "v", Desc: "View session details"},
+				{Key: "/", Desc: "Search sessions"},
+				{Key: "i", Desc: "View integrations"},
 				{Key: "r", Desc: "Refresh session list"},
+				{Key: "d", Desc: "Delete selected session"},
 				{Key: "s", Desc: "Open settings"},
 				{Key: "?", Desc: "Show this help"},
 				{Key: "q", Desc: "Quit application"},
+			},
+		},
+		{
+			Title: "Integration List",
+			Bindings: []HelpBinding{
+				{Key: "↑/↓ or j/k", Desc: "Navigate integrations"},
+				{Key: "enter or s", Desc: "Sync selected integration"},
+				{Key: "a or n", Desc: "Add new integration"},
+				{Key: "e", Desc: "Edit selected integration"},
+				{Key: "d", Desc: "Delete selected integration"},
+				{Key: "esc", Desc: "Back to sessions"},
 			},
 		},
 		{
@@ -166,6 +178,15 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keyMap.Down):
 			v.scroll++
 		}
+	case tea.MouseMsg:
+		switch msg.Type {
+		case tea.MouseWheelUp:
+			if v.scroll > 0 {
+				v.scroll--
+			}
+		case tea.MouseWheelDown:
+			v.scroll++
+		}
 	}
 
 	return v, nil
@@ -175,26 +196,69 @@ func (v *HelpView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *HelpView) View() string {
 	var b strings.Builder
 
-	b.WriteString(v.theme.Title.Render("My-Leapp Help"))
-	b.WriteString("\n")
-	b.WriteString(v.theme.Subtitle.Render("AWS Credentials Manager"))
-	b.WriteString("\n\n")
+	// Build all content first
+	var content strings.Builder
+
+	content.WriteString(v.theme.Title.Render("My-Leapp Help"))
+	content.WriteString("\n")
+	content.WriteString(v.theme.Subtitle.Render("AWS Credentials Manager"))
+	content.WriteString("\n\n")
 
 	for _, section := range v.sections {
-		b.WriteString(v.theme.SessionName.Render(section.Title))
-		b.WriteString("\n")
-		b.WriteString(strings.Repeat("─", len(section.Title)))
-		b.WriteString("\n")
+		content.WriteString(v.theme.SessionName.Render(section.Title))
+		content.WriteString("\n")
+		content.WriteString(strings.Repeat("─", len(section.Title)))
+		content.WriteString("\n")
 
 		for _, binding := range section.Bindings {
 			keyStr := v.theme.HelpKey.Render(padRight(binding.Key, 20))
 			descStr := v.theme.HelpDesc.Render(binding.Desc)
-			b.WriteString("  " + keyStr + descStr + "\n")
+			content.WriteString("  " + keyStr + descStr + "\n")
 		}
-		b.WriteString("\n")
+		content.WriteString("\n")
 	}
 
-	b.WriteString(v.theme.Footer.Render("Press esc or ? to close help"))
+	// Split content into lines
+	lines := strings.Split(content.String(), "\n")
+
+	// Calculate available height for content (reserve space for footer)
+	availableHeight := v.height - 2
+	if availableHeight < 1 {
+		availableHeight = 10 // Minimum height
+	}
+
+	// Limit scroll to valid range
+	maxScroll := len(lines) - availableHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if v.scroll > maxScroll {
+		v.scroll = maxScroll
+	}
+	if v.scroll < 0 {
+		v.scroll = 0
+	}
+
+	// Render visible portion
+	endLine := v.scroll + availableHeight
+	if endLine > len(lines) {
+		endLine = len(lines)
+	}
+
+	for i := v.scroll; i < endLine; i++ {
+		b.WriteString(lines[i])
+		if i < endLine-1 {
+			b.WriteString("\n")
+		}
+	}
+
+	// Footer with scroll indicator
+	b.WriteString("\n")
+	scrollInfo := ""
+	if maxScroll > 0 {
+		scrollInfo = fmt.Sprintf(" (↑↓ to scroll %d/%d)", v.scroll+1, maxScroll+1)
+	}
+	b.WriteString(v.theme.Footer.Render("Press esc or ? to close help" + scrollInfo))
 
 	return b.String()
 }

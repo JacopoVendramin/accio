@@ -8,32 +8,32 @@ import (
 // Color palette
 var (
 	// Primary colors
-	Primary     = lipgloss.Color("#7C3AED") // Purple
-	Secondary   = lipgloss.Color("#06B6D4") // Cyan
-	Accent      = lipgloss.Color("#F59E0B") // Amber
+	Primary   = lipgloss.Color("#7C3AED") // Purple
+	Secondary = lipgloss.Color("#06B6D4") // Cyan
+	Accent    = lipgloss.Color("#F59E0B") // Amber
 
 	// Status colors
-	Success     = lipgloss.Color("#10B981") // Green
-	Warning     = lipgloss.Color("#F59E0B") // Amber
-	Error       = lipgloss.Color("#EF4444") // Red
-	Info        = lipgloss.Color("#3B82F6") // Blue
+	Success = lipgloss.Color("#10B981") // Green
+	Warning = lipgloss.Color("#F59E0B") // Amber
+	Error   = lipgloss.Color("#EF4444") // Red
+	Info    = lipgloss.Color("#3B82F6") // Blue
 
 	// Neutral colors
-	Text        = lipgloss.Color("#F9FAFB") // Light gray
-	TextMuted   = lipgloss.Color("#9CA3AF") // Muted gray
-	Background  = lipgloss.Color("#111827") // Dark background
-	Surface     = lipgloss.Color("#1F2937") // Card background
-	Border      = lipgloss.Color("#374151") // Border color
+	Text       = lipgloss.Color("#F9FAFB") // Light gray
+	TextMuted  = lipgloss.Color("#9CA3AF") // Muted gray
+	Background = lipgloss.Color("#111827") // Dark background
+	Surface    = lipgloss.Color("#1F2937") // Card background
+	Border     = lipgloss.Color("#374151") // Border color
 )
 
 // Theme holds all the styles for the application.
 type Theme struct {
 	// Layout
-	App           lipgloss.Style
-	Header        lipgloss.Style
-	Footer        lipgloss.Style
-	Content       lipgloss.Style
-	Sidebar       lipgloss.Style
+	App     lipgloss.Style
+	Header  lipgloss.Style
+	Footer  lipgloss.Style
+	Content lipgloss.Style
+	Sidebar lipgloss.Style
 
 	// Session list
 	SessionItem         lipgloss.Style
@@ -45,37 +45,37 @@ type Theme struct {
 	SessionStatus       lipgloss.Style
 
 	// Status badges
-	StatusActive    lipgloss.Style
-	StatusInactive  lipgloss.Style
-	StatusExpiring  lipgloss.Style
-	StatusError     lipgloss.Style
-	StatusPending   lipgloss.Style
+	StatusActive   lipgloss.Style
+	StatusInactive lipgloss.Style
+	StatusExpiring lipgloss.Style
+	StatusError    lipgloss.Style
+	StatusPending  lipgloss.Style
 
 	// General UI
-	Title           lipgloss.Style
-	Subtitle        lipgloss.Style
-	Label           lipgloss.Style
-	Value           lipgloss.Style
-	HelpKey         lipgloss.Style
-	HelpDesc        lipgloss.Style
-	ErrorText       lipgloss.Style
-	SuccessText     lipgloss.Style
-	WarningText     lipgloss.Style
-	InfoText        lipgloss.Style
+	Title       lipgloss.Style
+	Subtitle    lipgloss.Style
+	Label       lipgloss.Style
+	Value       lipgloss.Style
+	HelpKey     lipgloss.Style
+	HelpDesc    lipgloss.Style
+	ErrorText   lipgloss.Style
+	SuccessText lipgloss.Style
+	WarningText lipgloss.Style
+	InfoText    lipgloss.Style
 
 	// Input
-	Input           lipgloss.Style
-	InputFocused    lipgloss.Style
+	Input            lipgloss.Style
+	InputFocused     lipgloss.Style
 	InputPlaceholder lipgloss.Style
 
 	// Buttons
-	Button          lipgloss.Style
-	ButtonFocused   lipgloss.Style
-	ButtonDisabled  lipgloss.Style
+	Button         lipgloss.Style
+	ButtonFocused  lipgloss.Style
+	ButtonDisabled lipgloss.Style
 
 	// Dialog
-	Dialog          lipgloss.Style
-	DialogTitle     lipgloss.Style
+	Dialog      lipgloss.Style
+	DialogTitle lipgloss.Style
 }
 
 // DefaultTheme returns the default theme.
@@ -112,14 +112,13 @@ func DefaultTheme() *Theme {
 
 		// Session list
 		SessionItem: lipgloss.NewStyle().
-			Padding(0, 2).
+			PaddingLeft(2).
 			MarginBottom(0),
 
 		SessionItemSelected: lipgloss.NewStyle().
-			Padding(0, 2).
+			PaddingLeft(2).
 			MarginBottom(0).
-			Background(Surface).
-			Foreground(Text).
+			Foreground(Primary).
 			Bold(true),
 
 		SessionItemActive: lipgloss.NewStyle().
@@ -171,8 +170,7 @@ func DefaultTheme() *Theme {
 			MarginBottom(1),
 
 		Label: lipgloss.NewStyle().
-			Foreground(TextMuted).
-			Width(15),
+			Foreground(TextMuted),
 
 		Value: lipgloss.NewStyle().
 			Foreground(Text),
