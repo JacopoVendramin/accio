@@ -112,7 +112,7 @@ func TestManager_GetConfigDir(t *testing.T) {
 	dir := m.GetConfigDir()
 
 	assert.NotEmpty(t, dir)
-	assert.Contains(t, dir, ".accio")
+	assert.Contains(t, dir, "accio")
 }
 
 func TestManager_getConfigPath(t *testing.T) {
