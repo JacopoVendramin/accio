@@ -65,14 +65,14 @@ type SSOProvider interface {
 
 // DeviceAuthorizationResponse contains the device authorization response.
 type DeviceAuthorizationResponse struct {
-	ClientID             string
-	ClientSecret         string
-	DeviceCode           string
-	UserCode             string
-	VerificationURI      string
+	ClientID                string
+	ClientSecret            string
+	DeviceCode              string
+	UserCode                string
+	VerificationURI         string
 	VerificationURIComplete string
-	ExpiresIn            int
-	Interval             int
+	ExpiresIn               int
+	Interval                int
 }
 
 // SSOToken contains an SSO access token.
@@ -91,6 +91,6 @@ type SSOAccount struct {
 
 // SSORole represents a role in an SSO account.
 type SSORole struct {
-	RoleName    string
-	AccountID   string
+	RoleName  string
+	AccountID string
 }

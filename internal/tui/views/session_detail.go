@@ -13,12 +13,12 @@ import (
 
 // SessionDetailKeyMap defines key bindings for the session detail view.
 type SessionDetailKeyMap struct {
-	Back    key.Binding
-	Start   key.Binding
-	Stop    key.Binding
-	Edit    key.Binding
-	Copy    key.Binding
-	Quit    key.Binding
+	Back  key.Binding
+	Start key.Binding
+	Stop  key.Binding
+	Edit  key.Binding
+	Copy  key.Binding
+	Quit  key.Binding
 }
 
 // DefaultSessionDetailKeyMap returns the default key bindings.
@@ -61,11 +61,11 @@ type SessionDetailView struct {
 	height  int
 
 	// Callbacks
-	onBack   func() tea.Cmd
-	onStart  func(*session.Session) tea.Cmd
-	onStop   func(*session.Session) tea.Cmd
-	onEdit   func(*session.Session) tea.Cmd
-	onCopy   func(*session.Session) tea.Cmd
+	onBack  func() tea.Cmd
+	onStart func(*session.Session) tea.Cmd
+	onStop  func(*session.Session) tea.Cmd
+	onEdit  func(*session.Session) tea.Cmd
+	onCopy  func(*session.Session) tea.Cmd
 }
 
 // NewSessionDetailView creates a new session detail view.

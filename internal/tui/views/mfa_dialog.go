@@ -32,13 +32,13 @@ func DefaultMFADialogKeyMap() MFADialogKeyMap {
 
 // MFADialogView shows a dialog for entering MFA token.
 type MFADialogView struct {
-	session  *session.Session
-	input    textinput.Model
-	theme    *styles.Theme
-	keyMap   MFADialogKeyMap
-	width    int
-	height   int
-	err      string
+	session *session.Session
+	input   textinput.Model
+	theme   *styles.Theme
+	keyMap  MFADialogKeyMap
+	width   int
+	height  int
+	err     string
 
 	// Callbacks
 	onSubmit func(*session.Session, string) tea.Cmd

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	serviceName    = "accio"
+	serviceName      = "accio"
 	credentialPrefix = "cred:"
 	secretPrefix     = "secret:"
 )

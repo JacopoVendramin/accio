@@ -17,11 +17,11 @@ const (
 
 // Integration represents an SSO or SAML identity provider integration.
 type Integration struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Type      IntegrationType `json:"type"`
-	Config    IntegrationConfig `json:"config"`
-	Metadata  IntegrationMetadata `json:"metadata"`
+	ID       string              `json:"id"`
+	Name     string              `json:"name"`
+	Type     IntegrationType     `json:"type"`
+	Config   IntegrationConfig   `json:"config"`
+	Metadata IntegrationMetadata `json:"metadata"`
 }
 
 // IntegrationConfig holds integration-specific configuration.
@@ -32,20 +32,20 @@ type IntegrationConfig struct {
 
 // AWSSSOIntegrationConfig holds AWS SSO portal configuration.
 type AWSSSOIntegrationConfig struct {
-	StartURL     string `json:"start_url"`
-	Region       string `json:"region"`
+	StartURL string `json:"start_url"`
+	Region   string `json:"region"`
 
 	// Cached after successful login
-	AccessToken  string    `json:"-"` // Stored in keyring
-	ExpiresAt    time.Time `json:"expires_at,omitempty"`
+	AccessToken string    `json:"-"` // Stored in keyring
+	ExpiresAt   time.Time `json:"expires_at,omitempty"`
 }
 
 // SAMLIntegrationConfig holds SAML IdP configuration.
 type SAMLIntegrationConfig struct {
-	IdPType     string `json:"idp_type"` // okta, onelogin, azure_ad, etc.
-	IdPURL      string `json:"idp_url"`
-	AppID       string `json:"app_id,omitempty"`
-	Username    string `json:"username,omitempty"`
+	IdPType  string `json:"idp_type"` // okta, onelogin, azure_ad, etc.
+	IdPURL   string `json:"idp_url"`
+	AppID    string `json:"app_id,omitempty"`
+	Username string `json:"username,omitempty"`
 }
 
 // IntegrationMetadata holds non-essential integration metadata.

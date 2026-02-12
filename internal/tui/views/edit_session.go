@@ -72,17 +72,17 @@ type EditableField struct {
 
 // EditSessionView shows a form for editing a session.
 type EditSessionView struct {
-	session  *session.Session
-	fields   []EditableField
-	cursor   int
-	editing  bool
-	input    textinput.Model
-	helpBar  *components.HelpBar
-	theme    *styles.Theme
-	keyMap   EditSessionKeyMap
-	width    int
-	height   int
-	changed  bool
+	session *session.Session
+	fields  []EditableField
+	cursor  int
+	editing bool
+	input   textinput.Model
+	helpBar *components.HelpBar
+	theme   *styles.Theme
+	keyMap  EditSessionKeyMap
+	width   int
+	height  int
+	changed bool
 
 	// Callbacks
 	onSave   func(*session.Session) tea.Cmd

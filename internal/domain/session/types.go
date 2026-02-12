@@ -9,21 +9,21 @@ import (
 type SessionType string
 
 const (
-	SessionTypeIAMUser     SessionType = "iam_user"
-	SessionTypeAWSSSO      SessionType = "aws_sso"
-	SessionTypeIAMRole     SessionType = "iam_role_chained"
-	SessionTypeSAML        SessionType = "saml_federation"
+	SessionTypeIAMUser SessionType = "iam_user"
+	SessionTypeAWSSSO  SessionType = "aws_sso"
+	SessionTypeIAMRole SessionType = "iam_role_chained"
+	SessionTypeSAML    SessionType = "saml_federation"
 )
 
 // SessionStatus represents the current status of a session.
 type SessionStatus string
 
 const (
-	StatusInactive   SessionStatus = "inactive"
-	StatusActive     SessionStatus = "active"
-	StatusExpiring   SessionStatus = "expiring"
-	StatusError      SessionStatus = "error"
-	StatusPending    SessionStatus = "pending" // Waiting for user action (e.g., MFA, SSO login)
+	StatusInactive SessionStatus = "inactive"
+	StatusActive   SessionStatus = "active"
+	StatusExpiring SessionStatus = "expiring"
+	StatusError    SessionStatus = "error"
+	StatusPending  SessionStatus = "pending" // Waiting for user action (e.g., MFA, SSO login)
 )
 
 // Provider represents a cloud provider.
@@ -70,10 +70,10 @@ type SAMLConfig struct {
 
 // SessionConfig is a union type for session-specific configuration.
 type SessionConfig struct {
-	IAMUser    *IAMUserConfig       `json:"iam_user,omitempty"`
-	AWSSSO     *AWSSSOConfig        `json:"aws_sso,omitempty"`
-	IAMRole    *IAMRoleChainedConfig `json:"iam_role,omitempty"`
-	SAML       *SAMLConfig          `json:"saml,omitempty"`
+	IAMUser *IAMUserConfig        `json:"iam_user,omitempty"`
+	AWSSSO  *AWSSSOConfig         `json:"aws_sso,omitempty"`
+	IAMRole *IAMRoleChainedConfig `json:"iam_role,omitempty"`
+	SAML    *SAMLConfig           `json:"saml,omitempty"`
 }
 
 // SessionMetadata holds non-essential session metadata.
