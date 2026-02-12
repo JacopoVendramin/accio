@@ -33,6 +33,7 @@ const (
 	ViewIntegrationCreate
 	ViewIntegrationEdit
 	ViewIntegrationSync
+	ViewAddMenu
 	ViewSettings
 	ViewHelp
 	ViewMFADialog
@@ -74,6 +75,7 @@ type App struct {
 	integrationWizardView *views.IntegrationWizardView
 	editIntegrationView   *views.EditIntegrationView
 	syncView              *views.SyncView
+	addMenuView           *views.AddMenuView
 	settingsView          *views.SettingsView
 	helpView              *views.HelpView
 	mfaDialogView         *views.MFADialogView
@@ -104,6 +106,7 @@ func NewApp(sessionService *session.Service, integrationService *integrationApp.
 	app.integrationWizardView = views.NewIntegrationWizardView(theme)
 	app.editIntegrationView = views.NewEditIntegrationView(theme)
 	app.syncView = views.NewSyncView(theme)
+	app.addMenuView = views.NewAddMenuView(theme)
 	app.settingsView = views.NewSettingsView(theme)
 	app.helpView = views.NewHelpView(theme)
 	app.mfaDialogView = views.NewMFADialogView(theme)
@@ -152,6 +155,10 @@ func NewApp(sessionService *session.Service, integrationService *integrationApp.
 	// Set up integration wizard callbacks
 	app.integrationWizardView.SetOnCreate(app.handleCreateIntegration)
 	app.integrationWizardView.SetOnCancel(app.handleCancelIntegrationCreate)
+
+	// Set up add menu callbacks
+	app.addMenuView.SetOnSelect(app.handleAddMenuSelect)
+	app.addMenuView.SetOnCancel(app.handleBack)
 
 	// Set up edit integration view callbacks
 	app.editIntegrationView.SetOnSave(app.handleSaveIntegration)
@@ -540,6 +547,8 @@ func (a *App) updateCurrentView(msg tea.Msg) tea.Cmd {
 		_, cmd = a.editIntegrationView.Update(msg)
 	case ViewIntegrationSync:
 		_, cmd = a.syncView.Update(msg)
+	case ViewAddMenu:
+		_, cmd = a.addMenuView.Update(msg)
 	case ViewSettings:
 		_, cmd = a.settingsView.Update(msg)
 	case ViewHelp:
@@ -562,6 +571,7 @@ func (a *App) updateViewSizes() {
 	a.integrationWizardView.SetSize(a.width, a.height)
 	a.editIntegrationView.SetSize(a.width, a.height)
 	a.syncView.SetSize(a.width, a.height)
+	a.addMenuView.SetSize(a.width, a.height)
 	a.settingsView.SetSize(a.width, a.height)
 	a.helpView.SetSize(a.width, a.height)
 	a.mfaDialogView.SetSize(a.width, a.height)
@@ -589,6 +599,8 @@ func (a *App) View() string {
 		content = a.editIntegrationView.View()
 	case ViewIntegrationSync:
 		content = a.syncView.View()
+	case ViewAddMenu:
+		content = a.addMenuView.View()
 	case ViewSettings:
 		content = a.settingsView.View()
 	case ViewHelp:
@@ -952,8 +964,22 @@ func (a *App) handleOpenURL(url string) tea.Cmd {
 
 func (a *App) handleAddIntegration() tea.Cmd {
 	return func() tea.Msg {
-		a.integrationWizardView.Reset()
-		return SwitchViewMsg{View: ViewIntegrationCreate}
+		a.addMenuView.Reset()
+		return SwitchViewMsg{View: ViewAddMenu}
+	}
+}
+
+func (a *App) handleAddMenuSelect(option views.AddMenuOption) tea.Cmd {
+	return func() tea.Msg {
+		switch option {
+		case views.AddMenuOptionSSOIntegration:
+			a.integrationWizardView.Reset()
+			return SwitchViewMsg{View: ViewIntegrationCreate}
+		case views.AddMenuOptionIAMUserSession:
+			a.createWizardView.Reset()
+			return SwitchViewMsg{View: ViewSessionCreate}
+		}
+		return nil
 	}
 }
 

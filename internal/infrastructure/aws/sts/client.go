@@ -3,12 +3,15 @@ package sts
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/jvendramin/accio/internal/domain/credential"
 )
 
@@ -61,7 +64,8 @@ func (c *Client) GetSessionToken(
 	// Get session token
 	result, err := client.GetSessionToken(ctx, input)
 	if err != nil {
-		return nil, err
+		// Enhance error with more details from AWS SDK
+		return nil, enhanceAWSError(err)
 	}
 
 	return &credential.Credential{
@@ -209,4 +213,20 @@ func DefaultSessionDuration() time.Duration {
 // MaxSessionDuration returns the maximum session duration for GetSessionToken.
 func MaxSessionDuration() time.Duration {
 	return 36 * time.Hour
+}
+
+// enhanceAWSError extracts detailed error information from AWS SDK errors.
+func enhanceAWSError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Try to extract API error details
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return fmt.Errorf("%s: %s (Code: %s)", apiErr.ErrorMessage(), err.Error(), apiErr.ErrorCode())
+	}
+
+	// Return original error if we can't enhance it
+	return err
 }

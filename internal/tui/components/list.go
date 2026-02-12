@@ -12,11 +12,11 @@ import (
 
 // SessionList is a component for displaying a list of sessions.
 type SessionList struct {
-	sessions []*session.Session
-	cursor   int
-	theme    *styles.Theme
-	width    int
-	height   int
+	sessions       []*session.Session
+	cursor         int
+	theme          *styles.Theme
+	width          int
+	height         int
 	showTimestamps bool
 	showRegion     bool
 }
@@ -148,11 +148,17 @@ func (l *SessionList) renderSession(sess *session.Session, selected bool) string
 
 	line := strings.Join(parts, " ")
 
-	// Apply selection style
+	// Apply selection style with cursor indicator
+	cursor := "  "
 	if selected {
-		return l.theme.SessionItemSelected.Render("▶ " + line)
+		cursor = "> "
 	}
-	return l.theme.SessionItem.Render("  " + line)
+
+	// Render with style (cursor is inside the styled content)
+	if selected {
+		return l.theme.SessionItemSelected.Render(cursor + line)
+	}
+	return l.theme.SessionItem.Render(cursor + line)
 }
 
 // formatSessionType returns a short string for the session type.

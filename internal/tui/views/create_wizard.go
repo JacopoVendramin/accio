@@ -63,12 +63,12 @@ func DefaultCreateWizardKeyMap() CreateWizardKeyMap {
 
 // CreateWizardView is a wizard for creating new sessions.
 type CreateWizardView struct {
-	step           WizardStep
-	sessionType    session.SessionType
-	theme          *styles.Theme
-	keyMap         CreateWizardKeyMap
-	width          int
-	height         int
+	step        WizardStep
+	sessionType session.SessionType
+	theme       *styles.Theme
+	keyMap      CreateWizardKeyMap
+	width       int
+	height      int
 
 	// Input fields
 	nameInput       textinput.Model
@@ -83,9 +83,14 @@ type CreateWizardView struct {
 	roleARNInput    textinput.Model
 	externalIDInput textinput.Model
 
+	// Region search state
+	filteredRegions []string
+	regionCursor    int
+	useCustomRegion bool
+
 	// Parent session selector
-	parentSessions  []*session.Session
-	parentCursor    int
+	parentSessions []*session.Session
+	parentCursor   int
 
 	// Type selector
 	typeCursor int
@@ -114,7 +119,7 @@ func NewCreateWizardView(theme *styles.Theme) *CreateWizardView {
 		keyMap:          DefaultCreateWizardKeyMap(),
 		nameInput:       makeInput("My AWS Account", false),
 		profileInput:    makeInput("my-aws-profile", false),
-		regionInput:     makeInput("us-east-1", false),
+		regionInput:     makeInput("Search or type custom region...", false),
 		accessKeyInput:  makeInput("AKIA...", false),
 		secretKeyInput:  makeInput("secret key", true),
 		mfaSerialInput:  makeInput("arn:aws:iam::123456789012:mfa/user (optional)", false),
@@ -123,10 +128,12 @@ func NewCreateWizardView(theme *styles.Theme) *CreateWizardView {
 		roleNameInput:   makeInput("MyRole", false),
 		roleARNInput:    makeInput("arn:aws:iam::123456789012:role/MyRole", false),
 		externalIDInput: makeInput("external-id (optional)", false),
+		filteredRegions: AWSRegions,
+		regionCursor:    0,
+		useCustomRegion: false,
 	}
 
 	v.nameInput.Focus()
-	v.regionInput.SetValue("us-east-1")
 
 	return v
 }
@@ -152,14 +159,41 @@ func (v *CreateWizardView) SetOnCancel(fn func() tea.Cmd) {
 	v.onCancel = fn
 }
 
+// filterRegions filters regions based on the current input.
+func (v *CreateWizardView) filterRegions() {
+	query := strings.ToLower(strings.TrimSpace(v.regionInput.Value()))
+	if query == "" {
+		v.filteredRegions = AWSRegions
+		v.regionCursor = 0
+		return
+	}
+
+	var filtered []string
+	for _, region := range AWSRegions {
+		if strings.Contains(strings.ToLower(region), query) {
+			filtered = append(filtered, region)
+		}
+	}
+	v.filteredRegions = filtered
+	if v.regionCursor >= len(v.filteredRegions) {
+		v.regionCursor = len(v.filteredRegions) - 1
+	}
+	if v.regionCursor < 0 {
+		v.regionCursor = 0
+	}
+}
+
 // Reset resets the wizard to the initial state.
 func (v *CreateWizardView) Reset() {
 	v.step = StepSelectType
 	v.typeCursor = 0
 	v.parentCursor = 0
+	v.regionCursor = 0
+	v.useCustomRegion = false
+	v.filteredRegions = AWSRegions
 	v.nameInput.SetValue("")
 	v.profileInput.SetValue("")
-	v.regionInput.SetValue("us-east-1")
+	v.regionInput.SetValue("")
 	v.accessKeyInput.SetValue("")
 	v.secretKeyInput.SetValue("")
 	v.mfaSerialInput.SetValue("")
@@ -176,6 +210,44 @@ func (v *CreateWizardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// Handle region step specially for search and navigation
+		if v.step == StepRegion {
+			switch msg.String() {
+			case "esc":
+				if v.onCancel != nil {
+					return v, v.onCancel()
+				}
+				return v, nil
+			case "enter":
+				return v, v.nextStep()
+			case "shift+tab":
+				v.prevStep()
+				return v, nil
+			case "up", "ctrl+p":
+				if !v.useCustomRegion && v.regionCursor > 0 {
+					v.regionCursor--
+				}
+				return v, nil
+			case "down", "ctrl+n":
+				if !v.useCustomRegion && v.regionCursor < len(v.filteredRegions)-1 {
+					v.regionCursor++
+				}
+				return v, nil
+			case "tab":
+				// Toggle between search results and custom input mode
+				v.useCustomRegion = !v.useCustomRegion
+				if !v.useCustomRegion && len(v.filteredRegions) == 0 {
+					v.useCustomRegion = true // Force custom if no matches
+				}
+				return v, nil
+			default:
+				// Update region input and filter
+				v.regionInput, cmd = v.regionInput.Update(msg)
+				v.filterRegions()
+				return v, cmd
+			}
+		}
+
 		switch {
 		case key.Matches(msg, v.keyMap.Cancel):
 			if v.onCancel != nil {
@@ -228,8 +300,6 @@ func (v *CreateWizardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.nameInput, cmd = v.nameInput.Update(msg)
 	case StepProfileName:
 		v.profileInput, cmd = v.profileInput.Update(msg)
-	case StepRegion:
-		v.regionInput, cmd = v.regionInput.Update(msg)
 	case StepIAMAccessKey:
 		v.accessKeyInput, cmd = v.accessKeyInput.Update(msg)
 	case StepIAMSecretKey:
@@ -279,11 +349,26 @@ func (v *CreateWizardView) nextStep() tea.Cmd {
 		v.regionInput.Focus()
 
 	case StepRegion:
+		// Get the selected region value
+		var selectedRegion string
+		if v.useCustomRegion || len(v.filteredRegions) == 0 {
+			selectedRegion = strings.TrimSpace(v.regionInput.Value())
+		} else {
+			if v.regionCursor < len(v.filteredRegions) {
+				selectedRegion = v.filteredRegions[v.regionCursor]
+			}
+		}
+
+		// Validate region is not empty
+		if selectedRegion == "" {
+			return nil
+		}
+
 		v.regionInput.Blur()
 		switch v.sessionType {
 		case session.SessionTypeIAMUser:
-			v.step = StepIAMAccessKey
-			v.accessKeyInput.Focus()
+			v.step = StepIAMMFASerial
+			v.mfaSerialInput.Focus()
 		case session.SessionTypeAWSSSO:
 			v.step = StepSSOStartURL
 			v.ssoURLInput.Focus()
@@ -292,6 +377,11 @@ func (v *CreateWizardView) nextStep() tea.Cmd {
 			v.roleARNInput.Focus()
 		}
 
+	case StepIAMMFASerial:
+		v.mfaSerialInput.Blur()
+		v.step = StepIAMAccessKey
+		v.accessKeyInput.Focus()
+
 	case StepIAMAccessKey:
 		v.accessKeyInput.Blur()
 		v.step = StepIAMSecretKey
@@ -299,11 +389,6 @@ func (v *CreateWizardView) nextStep() tea.Cmd {
 
 	case StepIAMSecretKey:
 		v.secretKeyInput.Blur()
-		v.step = StepIAMMFASerial
-		v.mfaSerialInput.Focus()
-
-	case StepIAMMFASerial:
-		v.mfaSerialInput.Blur()
 		v.step = StepConfirm
 
 	case StepSSOStartURL:
@@ -348,12 +433,12 @@ func (v *CreateWizardView) prevStep() {
 		v.step = StepSessionName
 	case StepRegion:
 		v.step = StepProfileName
-	case StepIAMAccessKey:
+	case StepIAMMFASerial:
 		v.step = StepRegion
+	case StepIAMAccessKey:
+		v.step = StepIAMMFASerial
 	case StepIAMSecretKey:
 		v.step = StepIAMAccessKey
-	case StepIAMMFASerial:
-		v.step = StepIAMSecretKey
 	case StepSSOStartURL:
 		v.step = StepRegion
 	case StepSSOAccountID:
@@ -369,7 +454,7 @@ func (v *CreateWizardView) prevStep() {
 	case StepConfirm:
 		switch v.sessionType {
 		case session.SessionTypeIAMUser:
-			v.step = StepIAMMFASerial
+			v.step = StepIAMSecretKey
 		case session.SessionTypeAWSSSO:
 			v.step = StepSSORoleName
 		case session.SessionTypeIAMRole:
@@ -380,12 +465,24 @@ func (v *CreateWizardView) prevStep() {
 
 // createSession creates the session from the wizard data.
 func (v *CreateWizardView) createSession() tea.Cmd {
+	// Get the selected region
+	var selectedRegion string
+	if v.useCustomRegion || len(v.filteredRegions) == 0 {
+		selectedRegion = strings.TrimSpace(v.regionInput.Value())
+	} else {
+		if v.regionCursor < len(v.filteredRegions) {
+			selectedRegion = v.filteredRegions[v.regionCursor]
+		} else {
+			selectedRegion = "us-east-1" // Default fallback
+		}
+	}
+
 	sess := session.NewSession(
 		v.nameInput.Value(),
 		session.ProviderAWS,
 		v.sessionType,
 		v.profileInput.Value(),
-		v.regionInput.Value(),
+		selectedRegion,
 	)
 
 	var secretKey string
@@ -401,7 +498,7 @@ func (v *CreateWizardView) createSession() tea.Cmd {
 	case session.SessionTypeAWSSSO:
 		sess.Config.AWSSSO = &session.AWSSSOConfig{
 			StartURL:  v.ssoURLInput.Value(),
-			Region:    v.regionInput.Value(),
+			Region:    selectedRegion,
 			AccountID: v.accountIDInput.Value(),
 			RoleName:  v.roleNameInput.Value(),
 		}
@@ -449,33 +546,105 @@ func (v *CreateWizardView) View() string {
 		}
 
 	case StepSessionName:
-		b.WriteString(v.theme.Label.Render("Session Name:"))
+		b.WriteString(v.theme.Label.Render("Session Alias *"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("A friendly name to identify this session"))
+		b.WriteString("\n\n")
 		b.WriteString(v.nameInput.View())
 
 	case StepProfileName:
-		b.WriteString(v.theme.Label.Render("AWS Profile Name:"))
+		b.WriteString(v.theme.Label.Render("Named Profile *"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("AWS CLI profile name for this session"))
+		b.WriteString("\n\n")
 		b.WriteString(v.profileInput.View())
 
 	case StepRegion:
 		b.WriteString(v.theme.Label.Render("Default Region:"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("Search or type a custom region"))
+		b.WriteString("\n\n")
+
+		// Search input
 		b.WriteString(v.regionInput.View())
+		b.WriteString("\n\n")
+
+		if v.useCustomRegion {
+			// Show custom region mode
+			b.WriteString(v.theme.InfoText.Render("Using custom region: "))
+			inputVal := v.regionInput.Value()
+			if inputVal == "" {
+				b.WriteString(v.theme.Subtitle.Render("(type region name above)"))
+			} else {
+				b.WriteString(v.theme.Value.Render(inputVal))
+			}
+			b.WriteString("\n\n")
+			b.WriteString(v.theme.Subtitle.Render("Press Tab to switch back to region list"))
+		} else if len(v.filteredRegions) == 0 {
+			// No matches - suggest custom
+			b.WriteString(v.theme.Subtitle.Render("No matching regions found."))
+			b.WriteString("\n")
+			if v.regionInput.Value() != "" {
+				b.WriteString(v.theme.InfoText.Render("Press Tab to use '"))
+				b.WriteString(v.theme.Value.Render(v.regionInput.Value()))
+				b.WriteString(v.theme.InfoText.Render("' as custom region"))
+			}
+		} else {
+			// Show filtered regions
+			maxVisible := 7
+			start := v.regionCursor - 3
+			if start < 0 {
+				start = 0
+			}
+			end := start + maxVisible
+			if end > len(v.filteredRegions) {
+				end = len(v.filteredRegions)
+				start = end - maxVisible
+				if start < 0 {
+					start = 0
+				}
+			}
+
+			for i := start; i < end; i++ {
+				region := v.filteredRegions[i]
+				cursor := "  "
+				style := v.theme.SessionItem
+				if i == v.regionCursor {
+					cursor = "▶ "
+					style = v.theme.SessionItemSelected
+				}
+				b.WriteString(style.Render(cursor + region))
+				b.WriteString("\n")
+			}
+
+			if len(v.filteredRegions) < len(AWSRegions) {
+				b.WriteString("\n")
+				b.WriteString(v.theme.Subtitle.Render(fmt.Sprintf("  %d matching regions", len(v.filteredRegions))))
+			}
+
+			b.WriteString("\n")
+			b.WriteString(v.theme.InfoText.Render("Press Tab to enter custom region"))
+		}
 
 	case StepIAMAccessKey:
-		b.WriteString(v.theme.Label.Render("Access Key ID:"))
+		b.WriteString(v.theme.Label.Render("Access Key ID *"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("Your AWS IAM user access key ID"))
+		b.WriteString("\n\n")
 		b.WriteString(v.accessKeyInput.View())
 
 	case StepIAMSecretKey:
-		b.WriteString(v.theme.Label.Render("Secret Access Key:"))
+		b.WriteString(v.theme.Label.Render("Secret Access Key *"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("Your AWS IAM user secret access key (will be stored securely)"))
+		b.WriteString("\n\n")
 		b.WriteString(v.secretKeyInput.View())
 
 	case StepIAMMFASerial:
-		b.WriteString(v.theme.Label.Render("MFA Serial (optional):"))
+		b.WriteString(v.theme.Label.Render("MFA Device (optional):"))
 		b.WriteString("\n")
+		b.WriteString(v.theme.Subtitle.Render("MFA Device ARN or Serial Number"))
+		b.WriteString("\n\n")
 		b.WriteString(v.mfaSerialInput.View())
 
 	case StepSSOStartURL:
@@ -547,17 +716,30 @@ func (v *CreateWizardView) renderSummary() string {
 		))
 	}
 
-	renderLine("Name", v.nameInput.Value())
-	renderLine("Profile", v.profileInput.Value())
-	renderLine("Region", v.regionInput.Value())
+	// Get the selected region
+	var selectedRegion string
+	if v.useCustomRegion || len(v.filteredRegions) == 0 {
+		selectedRegion = strings.TrimSpace(v.regionInput.Value())
+	} else {
+		if v.regionCursor < len(v.filteredRegions) {
+			selectedRegion = v.filteredRegions[v.regionCursor]
+		} else {
+			selectedRegion = "us-east-1"
+		}
+	}
+
+	renderLine("Session Alias", v.nameInput.Value())
+	renderLine("Named Profile", v.profileInput.Value())
+	renderLine("Region", selectedRegion)
 	renderLine("Type", formatSessionTypeFull(v.sessionType))
 
 	switch v.sessionType {
 	case session.SessionTypeIAMUser:
-		renderLine("Access Key", v.accessKeyInput.Value())
 		if v.mfaSerialInput.Value() != "" {
-			renderLine("MFA", v.mfaSerialInput.Value())
+			renderLine("MFA Device", v.mfaSerialInput.Value())
 		}
+		renderLine("Access Key ID", v.accessKeyInput.Value())
+		renderLine("Secret Key", "****** (hidden)")
 	case session.SessionTypeAWSSSO:
 		renderLine("SSO URL", v.ssoURLInput.Value())
 		renderLine("Account", v.accountIDInput.Value())

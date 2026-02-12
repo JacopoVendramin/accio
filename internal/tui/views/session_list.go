@@ -101,6 +101,7 @@ func NewSessionListView(theme *styles.Theme) *SessionListView {
 	helpBar.SetBindings([]components.KeyBinding{
 		{Key: "↑/↓", Desc: "navigate"},
 		{Key: "enter", Desc: "connect"},
+		{Key: "d", Desc: "delete"},
 		{Key: "/", Desc: "search"},
 		{Key: "i", Desc: "integrations"},
 		{Key: "?", Desc: "help"},
@@ -464,13 +465,15 @@ func (v *SessionListView) renderSession(sess *session.Session, selected bool) st
 	}
 
 	// Cursor
-	cursor := " "
+	cursor := "  "
+	style := v.theme.SessionItem
 	if selected {
-		cursor = "▶"
+		cursor = "▶ "
+		style = v.theme.SessionItemSelected
 	}
 
 	// Build the line: cursor, status, name, profile, region
-	line := fmt.Sprintf("  %s %s %s", cursor, statusStyle.Render(statusIcon), sess.Name)
+	line := fmt.Sprintf("%s%s %s", cursor, statusStyle.Render(statusIcon), sess.Name)
 
 	// Add profile and region info (without extra margin)
 	extras := []string{}
@@ -486,12 +489,8 @@ func (v *SessionListView) renderSession(sess *session.Session, selected bool) st
 		line += " " + subtitleStyle.Render("("+strings.Join(extras, " • ")+")")
 	}
 
-	// Apply bold if selected
-	if selected {
-		line = v.theme.SessionItemSelected.Render(line)
-	}
-
-	return line
+	// Apply style (always, not just when selected)
+	return style.Render(line)
 }
 
 // Init initializes the view.

@@ -81,7 +81,8 @@ func (p *IAMUserProvider) StartSession(ctx context.Context, sess *session.Sessio
 		mfaToken,
 	)
 	if err != nil {
-		return nil, domainErrors.NewDomainError("StartSession", domainErrors.ErrStorageFailure, err)
+		// Wrap AWS STS errors appropriately
+		return nil, domainErrors.NewDomainError("StartSession", domainErrors.ErrAWSError, err)
 	}
 
 	return cred, nil

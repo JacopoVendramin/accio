@@ -21,6 +21,8 @@ var (
 	ErrIntegrationNotFound  = errors.New("integration not found")
 	ErrStorageFailure       = errors.New("secure storage operation failed")
 	ErrProviderNotFound     = errors.New("provider not found")
+	ErrAuthenticationFailed = errors.New("authentication failed")
+	ErrAWSError             = errors.New("AWS API error")
 )
 
 // DomainError wraps an error with additional context.

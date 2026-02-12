@@ -30,26 +30,6 @@ const (
 	AuthMethodInApp     AuthMethod = "in_app"
 )
 
-// AWS regions for SSO
-var awsRegions = []string{
-	"us-east-1",
-	"us-east-2",
-	"us-west-1",
-	"us-west-2",
-	"eu-west-1",
-	"eu-west-2",
-	"eu-west-3",
-	"eu-central-1",
-	"eu-north-1",
-	"ap-southeast-1",
-	"ap-southeast-2",
-	"ap-northeast-1",
-	"ap-northeast-2",
-	"ap-south-1",
-	"sa-east-1",
-	"ca-central-1",
-}
-
 // IntegrationWizardKeyMap defines key bindings for the wizard.
 type IntegrationWizardKeyMap struct {
 	Next   key.Binding
@@ -87,11 +67,11 @@ func DefaultIntegrationWizardKeyMap() IntegrationWizardKeyMap {
 
 // IntegrationWizardView is a wizard for creating new integrations.
 type IntegrationWizardView struct {
-	step        IntegrationWizardStep
-	theme       *styles.Theme
-	keyMap      IntegrationWizardKeyMap
-	width       int
-	height      int
+	step   IntegrationWizardStep
+	theme  *styles.Theme
+	keyMap IntegrationWizardKeyMap
+	width  int
+	height int
 
 	// Selection cursors
 	typeCursor   int
@@ -138,7 +118,7 @@ func NewIntegrationWizardView(theme *styles.Theme) *IntegrationWizardView {
 		aliasInput:      aliasInput,
 		portalURLInput:  portalURLInput,
 		regionInput:     regionInput,
-		filteredRegions: awsRegions,
+		filteredRegions: AWSRegions,
 		selectedType:    integration.IntegrationTypeAWSSSO,
 		selectedRegion:  "us-east-1",
 		selectedAuth:    AuthMethodInBrowser,
@@ -170,7 +150,7 @@ func (v *IntegrationWizardView) Reset() {
 	v.aliasInput.SetValue("")
 	v.portalURLInput.SetValue("")
 	v.regionInput.SetValue("")
-	v.filteredRegions = awsRegions
+	v.filteredRegions = AWSRegions
 	v.useCustomRegion = false
 	v.selectedType = integration.IntegrationTypeAWSSSO
 	v.selectedRegion = "us-east-1"
@@ -250,13 +230,13 @@ func (v *IntegrationWizardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *IntegrationWizardView) filterRegions() {
 	query := strings.ToLower(strings.TrimSpace(v.regionInput.Value()))
 	if query == "" {
-		v.filteredRegions = awsRegions
+		v.filteredRegions = AWSRegions
 		v.regionCursor = 0
 		return
 	}
 
 	var filtered []string
-	for _, region := range awsRegions {
+	for _, region := range AWSRegions {
 		if strings.Contains(strings.ToLower(region), query) {
 			filtered = append(filtered, region)
 		}
@@ -321,7 +301,7 @@ func (v *IntegrationWizardView) nextStep() tea.Cmd {
 		v.portalURLInput.Blur()
 		v.step = IntegrationStepRegion
 		v.regionInput.Focus()
-		v.filteredRegions = awsRegions
+		v.filteredRegions = AWSRegions
 		v.regionCursor = 0
 		v.useCustomRegion = false
 
@@ -492,7 +472,7 @@ func (v *IntegrationWizardView) View() string {
 				b.WriteString("\n")
 			}
 
-			if len(v.filteredRegions) < len(awsRegions) {
+			if len(v.filteredRegions) < len(AWSRegions) {
 				b.WriteString(v.theme.Subtitle.Render("  "))
 				b.WriteString(v.theme.Subtitle.Render(formatMatches(len(v.filteredRegions))))
 				b.WriteString("\n")
